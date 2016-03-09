@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, Oracle and/or its affiliates. All rights reserved. */
+/* Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved. */
 
 /******************************************************************************
  *
@@ -33,24 +33,23 @@
  *****************************************************************************/
 
 var http     = require('http');
-var url      = require('url');
 var oracledb = require('oracledb');
 var dbConfig = require('./dbconfig.js');
 
 var portid = 7000;    // HTTP listening port number
 
 // Main entry point.  Creates a connection pool, on callback creates an
-// HTTP server and executes a query based on the URL parameter given
-// The pool values are arbitrary for the sake of showing how to set the properties.
+// HTTP server and executes a query based on the URL parameter given.
+// The pool values shown are the default values.
 oracledb.createPool (
   {
     user          : dbConfig.user,
     password      : dbConfig.password,
     connectString : dbConfig.connectString,
-    poolMax       : 44,
-    poolMin       : 2,
-    poolIncrement : 5,
-    poolTimeout   : 4
+    poolMax       : 4, // maximum size of the pool
+    poolMin       : 0, // let the pool shrink completely
+    poolIncrement : 1, // only grow the pool by one connection at a time
+    poolTimeout   : 0  // never terminate idle connections
   },
   function(err, pool)
   {
@@ -60,7 +59,7 @@ oracledb.createPool (
     }
 
     // Create HTTP server and listen on port - portid
-    hs = http.createServer (
+    var hs = http.createServer (
       function(request, response)  // Callback gets HTTP request & response object
       {
         var urlparts = request.url.split("/");
@@ -89,9 +88,9 @@ oracledb.createPool (
             // console.log("Connections in use: " + pool.connectionsInUse);
 
             connection.execute(
-              "SELECT employee_id, first_name, last_name "
-            + "FROM   employees "
-            + "WHERE  department_id = :id",
+              "SELECT   employee_id, first_name, last_name " +
+                "FROM   employees " +
+                "WHERE  department_id = :id",
               [deptid],  // bind variable value
               function(err, result)
               {
@@ -116,11 +115,11 @@ oracledb.createPool (
                   {
                     if (err) {
                       handleError(response, "normal release() callback", err);
-                      return;
+                    } else {
+                      htmlFooter(response);
                     }
                   });
 
-                htmlFooter(response);
               });
           });
       });
@@ -135,7 +134,7 @@ oracledb.createPool (
 function handleError(response, text, err)
 {
   if (err) {
-    text += err.message
+    text += err.message;
   }
   console.error(text);
   response.write("<p>Error: " + text + "</p>");
@@ -151,13 +150,13 @@ function displayResults(response, result, deptid)
 
   // Column Title
   response.write("<tr>");
-  for (col = 0; col < result.metaData.length; col++) {
+  for (var col = 0; col < result.metaData.length; col++) {
     response.write("<td>" + result.metaData[col].name + "</td>");
   }
   response.write("</tr>");
 
   // Rows
-  for (row = 0; row < result.rows.length; row++) {
+  for (var row = 0; row < result.rows.length; row++) {
     response.write("<tr>");
     for (col = 0; col < result.rows[row].length; col++) {
       response.write("<td>" + result.rows[row][col] + "</td>");
@@ -175,12 +174,12 @@ function htmlHeader(response, title, caption)
   response.write     ("<!DOCTYPE html>");
   response.write     ("<html>");
   response.write     ("<head>");
-  response.write     ("<style>"
-                    + "body {background:#FFFFFF;color:#000000;font-family:Arial,sans-serif;margin:40px;padding:10px;font-size:12px;text-align:center;}"
-                    + "h1 {margin:0px;margin-bottom:12px;background:#FF0000;text-align:center;color:#FFFFFF;font-size:28px;}"
-                    + "table {border-collapse: collapse;   margin-left:auto; margin-right:auto;}"
-                    + "td {padding:8px;border-style:solid}"
-                    + "</style>\n");
+  response.write     ("<style>" +
+                      "body {background:#FFFFFF;color:#000000;font-family:Arial,sans-serif;margin:40px;padding:10px;font-size:12px;text-align:center;}" +
+                      "h1 {margin:0px;margin-bottom:12px;background:#FF0000;text-align:center;color:#FFFFFF;font-size:28px;}" +
+                      "table {border-collapse: collapse;   margin-left:auto; margin-right:auto;}" +
+                      "td {padding:8px;border-style:solid}" +
+                     "</style>\n");
   response.write     ("<title>" + caption + "</title>");
   response.write     ("</head>");
   response.write     ("<body>");
@@ -194,3 +193,13 @@ function htmlFooter(response)
   response.write("</body>\n</html>");
   response.end();
 }
+
+process
+.on('SIGTERM', function() {
+  console.log("\nTerminating");
+  process.exit(0);
+})
+.on('SIGINT', function() {
+  console.log("\nTerminating");
+  process.exit(0);
+});

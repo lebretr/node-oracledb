@@ -16,17 +16,16 @@
  * limitations under the License.
  *
  * NAME
- *   plsql.js
+ *   plsqlfunc.js
  *
  * DESCRIPTION
- *   Show calling a PL/SQL procedure and binding parameters in various ways
- *   Use demo.sql to create the required procedure or do:
- * 
- *   CREATE OR REPLACE PROCEDURE testproc (p_in IN VARCHAR2, p_inout IN OUT VARCHAR2, p_out OUT NUMBER)
- *     AS
+ *   Show calling a PL/SQL function
+ *   Use demo.sql to create the required function or do:
+ *
+ *   CREATE OR REPLACE FUNCTION testfunc (p1_in IN VARCHAR2, p2_in IN VARCHAR2) RETURN VARCHAR2
+ *   AS
  *   BEGIN
- *     p_inout := p_in || p_inout;
- *     p_out := 101;
+ *     RETURN p1_in || p2_in;
  *   END;
  *   /
  *
@@ -46,16 +45,16 @@ oracledb.getConnection(
     if (err) { console.error(err.message); return; }
 
     var bindvars = {
-      i:  'Chris',  // bind type is determined from the data type
-      io: { val: 'Jones', dir : oracledb.BIND_INOUT },
-      o:  { type: oracledb.NUMBER, dir : oracledb.BIND_OUT },
-    }
+      p1:  'Chris', // Bind type is determined from the data.  Default direction is BIND_IN
+      p2:  'Jones',
+      ret:  { dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 40 }
+    };
     connection.execute(
-      "BEGIN testproc(:i, :io, :o); END;",
+      "BEGIN :ret := testfunc(:p1, :p2); END;",
       bindvars,
       function (err, result)
       {
         if (err) { console.error(err.message); return; }
-        console.log(result.outBinds);        
+        console.log(result.outBinds);
       });
   });

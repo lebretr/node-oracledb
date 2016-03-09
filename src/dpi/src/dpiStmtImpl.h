@@ -1,4 +1,5 @@
-/* Copyright (c) 2015, Oracle and/or its affiliates. All rights reserved. */
+/* Copyright (c) 2015, 2016 Oracle and/or its affiliates.
+   All rights reserved. */
 
 /******************************************************************************
  *
@@ -50,6 +51,8 @@ typedef struct
   void*         data;         /* Data for application specific callback */
   unsigned long nrows;        /* number of rows affected by this DML */
   unsigned long iter;         /* iteration - used in Array Bind */
+  unsigned int  bndpos;       /* position in the bind array */
+  short         nullInd;      /* DML RETURNING: to pass null from inbind cbk */
   StmtImpl*     dpistmt;      /* DPI Statement Implementation */
 } DpiCallbackCtx;
 
@@ -66,6 +69,7 @@ public:
   virtual DpiStmtType stmtType () const;
   virtual DPI_SZ_TYPE  rowsAffected () const;
   virtual unsigned int numCols() ;
+  virtual void prefetchRows( unsigned int prefetchRows ) ;
   virtual unsigned int rowsFetched () const ;
 
   // Methods
@@ -73,12 +77,16 @@ public:
 
   virtual void bind (unsigned int pos, unsigned short type, void *buf,
                      DPI_SZ_TYPE bufSize, short *ind, DPI_BUFLEN_TYPE *bufLen,
-                     void *data, cbtype cb );
+                     unsigned int maxarr_len, unsigned int *curelen,
+                     void *data, cbtype cb);
 
-  virtual void bind (const unsigned char *name, int nameLen,
+  virtual void bind (const unsigned char *name, int nameLen, 
+                     unsigned int bndpos,
                      unsigned short type, void *buf, DPI_SZ_TYPE bufSize,
                      short *ind, DPI_BUFLEN_TYPE *bufLen,
-                     void *data, cbtype cb);
+                     unsigned int maxarr_len, unsigned int *curelen,
+                     void *data,
+                     cbtype cb);
 
   virtual void execute ( int numIterations, bool autoCommit );
 
@@ -90,13 +98,7 @@ public:
 
   virtual OCIError *     getError () { return errh_;  }
 
-  // Is the SQL statement DML or not ?
-  virtual inline bool isDML () const
-  {
-    return ( ( stmtType_ == DpiStmtInsert ) ||
-             ( stmtType_ == DpiStmtUpdate ) ||
-             ( stmtType_ == DpiStmtDelete ) );
-  }
+  virtual unsigned int  getState ();
 
   virtual bool isReturning ();
 
@@ -110,7 +112,6 @@ public:
   static sb4 outbindCallback (dvoid *ctxp, OCIBind *bindp, ub4 iter, ub4 index,
                               dvoid **bufpp, ub4 **alenp, ub1 *piecep,
                               dvoid **indpp, ub2 **rcodepp );
-
 
 private:
   void cleanup ();
@@ -127,9 +128,11 @@ private:
 
   unsigned int   numCols_;         // # of cols this stmt execution will return
   MetaData       *meta_;           // Meta data array
-  DpiStmtType    stmtType_;        // Statement Type (Query, DML, ... )
+  unsigned short stmtType_;        // Statement Type (Query, DML, ... )
   bool           isReturning_;     // Does the stmt has RETURNING INTO clause?
   bool           isReturningSet_;  // Has isReturning_ flag queried & set.
+  bool           refCursor_;       // refCursor or not.
+  ub4            state_;           // OCI Stmt State
 };
 
 
